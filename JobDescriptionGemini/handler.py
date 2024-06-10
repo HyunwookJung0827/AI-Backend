@@ -64,11 +64,32 @@ chat_session = model.start_chat(
 @app.route('/', methods=['POST'])
 @cross_origin()  # allow all origins all methods.
 def handler():
-    data = request.json
     try:
-        prompt = "Write me a job description according to the following metadata dictionary: " + str(data)
+        data = request.json['values']
+        # print(data)
+        if '_id' in data:
+            del data['_id']
+        if 'description' in data:
+            del data['description']
+        if 'industryId' in data:
+            del data['industryId']
+        if 'companyLocationId' in data:
+            del data['companyLocationId']
+        if 'isExactLocation' in data:
+            del data['isExactLocation']
+        if 'hireTerm' in data:
+            del data['hireTerm']
+        for key in list(data):
+            if not data[key]:
+                del data[key]
+        if 'experienceLevel' in data and 'isExperienceRequired' in data:
+            del data['isExperienceRequired']
+        # print(data)
+        prompt = "Write me a job description in rich text format according to the following metadata dictionary. Do not include the job title or how-to-apply section. Do not use ** or #. Instead, if you want to style it, use tag such as <h1> or <strong>. Make sure every text is covered in tag like <p>. Here's the rest of metadata from the user:"  + str(data)
         response = chat_session.send_message(prompt)
-        print(response.text)
+        if response.text[0] != '<' or response.text[-1] != '>':
+            response.text = "<p>" + response.text + "</p>"
+        # print(type(response.text))
         return response.text
     except Exception as e:
         return str(e)
