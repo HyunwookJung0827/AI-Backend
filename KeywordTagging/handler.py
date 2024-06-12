@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
-from langdetect import detect, DetectorFactory
-from langdetect.lang_detect_exception import LangDetectException
 import json
+import fasttext
 
 app = Flask(__name__)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-# Skip reinstalling the required layer
-DetectorFactory.seed = 0
+# Path to the downloaded language identification model
+lang_model_path = 'lid.176.bin'
+
+# Load the FastText language identification model
+lang_model = fasttext.load_model(lang_model_path)
 
 # Set to use to detect when to catch a word for tagging
 wordStopperSet = {' ', '(', ')', '{', '}', '[', ']', '-', '/', ':', ';', '&', '+', '<', '>'}
@@ -112,10 +114,14 @@ def handler():
                         sentence = sentence[:-1]
                 while sentence and sentence[0] in unnecessaryEndsSet:
                     sentence = sentence[1:]
-                if len(sentence) >= 3:  # Skip empty sentences
-                    print(sentence)
-                    lang = detect(sentence)
-                    detectedLanguages.add(lang)
+                if len(sentence) >= 10:  # Skip empty sentences
+                    # Predict the language of the job description
+                    predictions = lang_model.predict(sentence, k=1)  # k=1 returns the top prediction
+                    lang = predictions[0][0].replace('__label__', '')
+                    confidence = predictions[1][0]
+                    #print(lang, confidence, sentence)
+                    if confidence > 0.8:
+                        detectedLanguages.add(lang)
                 # Update beginningOfSentence
                 beginningOfSentence = jobDescriptionIndex + 1
             
@@ -165,7 +171,30 @@ def handler():
 
         groupToKeywordDict['languages'] += [lang for lang in detectedLanguages if lang not in groupToKeywordDict['languages']]
         
-    except LangDetectException as e:
+        # Process the salary info
+        if salaryList:
+            # Sort the salaryList to get the max and min salary
+            salaryList = sorted(salaryList)
+            if len(salaryList) == 1:
+                groupToKeywordDict['payType'] = 'minimum'
+                groupToKeywordDict['salary'] = {'max': int(salaryList[0]), 'min': int(salaryList[0])}
+            else:
+                # If there are more than 1 salary info, it is a range
+                # It cannot be zero because we already checked if there is any salary info
+                groupToKeywordDict['payType'] = 'range'
+                # The last element is the max salary and the second to last element is the min salary
+                # The rest of smaller salary info are probably tips
+                groupToKeywordDict['salary'] = {'max': int(salaryList[-1]), 'min': int(salaryList[-2]) if len(salaryList[-1]) - len(salaryList[-2]) <= 1 else int(salaryList[-1])}
+                # print(groupToKeywordDict['salary'])
+
+            if len(str(groupToKeywordDict['salary']['max'])) <= 3:
+                # If the salary is hourly, it is less than $1000
+                groupToKeywordDict['payPeriod'] = 'hourly'
+            else:
+                # $1,000 ~ $999,999 and over is yearly
+                groupToKeywordDict['payPeriod'] = 'yearly'
+
+    except Exception as e:
         return jsonify({'error 3': f'Language detection failed: {str(e)}'}), 400
 
     return jsonify({
