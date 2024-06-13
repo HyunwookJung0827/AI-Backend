@@ -1,7 +1,7 @@
 import yake
 
 def extract_keywords(text, language="en", deduplication_threshold=0.9, num_of_keywords=20):
-    kw_extractor = yake.KeywordExtractor(lan=language, n=1, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
+    kw_extractor = yake.KeywordExtractor(lan=language, n=2, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
     keywords = kw_extractor.extract_keywords(text)
     return [kw for kw, score in keywords]
 

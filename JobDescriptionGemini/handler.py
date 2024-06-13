@@ -91,8 +91,10 @@ def handler():
             response.text = "<p>" + response.text + "</p>"
         # print(type(response.text))
         return response.text
+    except KeyError as e:
+        return f"KeyError: {str(e)}", 400
     except Exception as e:
-        return str(e)
+        return str(e), 500
     
 if __name__ == '__main__':
     app.run(debug=True, port=3002)
