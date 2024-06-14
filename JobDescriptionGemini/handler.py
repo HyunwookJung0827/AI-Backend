@@ -18,6 +18,8 @@ load_dotenv()
 
 # Get the API key from the environment variable
 api_key = os.getenv('API_KEY')
+if not api_key:
+    raise ValueError("API key missing")
 
 # Configure the generative AI library with the API key
 genai.configure(api_key=api_key)
@@ -87,12 +89,14 @@ def handler():
         # print(data)
         prompt = "Write me a job description in rich text format according to the following metadata dictionary. Do not include the job title or how-to-apply section. Do not use ** or #. Instead, if you want to style it, use tag such as <h1> or <strong>. Make sure every text is covered in tag like <p>. Here's the rest of metadata from the user:"  + str(data)
         response = chat_session.send_message(prompt)
-        if response.text[0] != '<' or response.text[-1] != '>':
+        if not response.text or response.text[0] != '<' or response.text[-1] != '>':
             response.text = "<p>" + response.text + "</p>"
         # print(type(response.text))
         return response.text
     except KeyError as e:
         return f"KeyError: {str(e)}", 400
+    except ValueError as e:
+        return str(e), 500
     except Exception as e:
         return str(e), 500
     
