@@ -1,22 +1,109 @@
 import yake
+import requests
+import fitz  # PyMuPDF
+import json
 
-def extract_keywords(text, language="en", deduplication_threshold=0.9, num_of_keywords=20):
-    kw_extractor = yake.KeywordExtractor(lan=language, n=1, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
+# Set to use to detect when to catch a word for tagging
+wordStopperSet = {' ', '(', ')', '{', '}', '[', ']', '-', '/', ':', ';', '&', '+', '<', '>'}
+# Set to use to detect some unnecessary ends of a word. Newly added for salary info processing
+unnecessaryEndsSet = {'.', ',', '(', ')', '{', '}', '[', ']', '-', '!', '/', ':', ';', '&', '+', '<', '>'}
+
+NUMBER_OF_KEYWORDS = 20 # Number of keywords to extract
+N = 1 # Number of words each keyword can contain
+
+def fetch_pdf(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.content
+    else:
+        raise Exception("Failed to fetch the PDF")
+
+def parse_pdf(pdf_content):
+    with fitz.open(stream=pdf_content, filetype="pdf") as doc:
+        text = ""
+        for page in doc:
+            text += page.get_text()
+    return text
+
+def extract_resume_data(text):
+    # Example: Extracting sections based on keywords
+    lines = text.split('\n')
+    name = None
+    contact_info = []
+    skills = []
+    
+    for line in lines:
+        if "Name" in line:
+            name = line.split(':')[1].strip()
+        elif "Email" in line or "Phone" in line:
+            contact_info.append(line.strip())
+        elif "Skills" in line:
+            skills_line_index = lines.index(line) + 1
+            skills = lines[skills_line_index].strip().split(', ')
+    
+    resume_data = {
+        'name': name,
+        'contact_info': contact_info,
+        'skills': skills
+    }
+    
+    return resume_data
+
+def structure_data(resume_data):
+    return json.dumps(resume_data, indent=2)
+
+url = "https://cdn.workonward.com/bfd60054-85e7-4c4a-ac01-81e2f10feec3.pdf"
+pdf_content = fetch_pdf(url)
+text = parse_pdf(pdf_content)
+resume_data = extract_resume_data(text)
+structured_resume = structure_data(resume_data)
+
+print(pdf_content)
+print(text)
+print(resume_data)
+print(structured_resume)
+
+def extract_keywords(text, language="en", deduplication_threshold=0.9, num_of_keywords=NUMBER_OF_KEYWORDS):
+    kw_extractor = yake.KeywordExtractor(lan=language, n=N, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
     keywords = kw_extractor.extract_keywords(text)
     return [kw for kw, score in keywords]
 
 def score_resume(parsed_data, job_description):
-    resume_text = ' '.join([parsed_data.get('summary', ''), ' '.join(parsed_data.get('skills', []))])
-    resume_keywords = extract_keywords(resume_text)
-    job_keywords = extract_keywords(job_description)
+    resumeText = parsed_data
+    beginningOfWord = 0
+    jobKeywords = {keyword.lower(): False for keyword in extract_keywords(job_description)}
+    for resumeTextIndex, char in enumerate(resumeText):
+        if char in wordStopperSet and beginningOfWord < resumeTextIndex or resumeTextIndex == len(resumeText) - 1:
+            # Process each word in lowercase
+            word = resumeText[beginningOfWord: resumeTextIndex].strip().lower()
+            while word and word[-1] in unnecessaryEndsSet:
+                word = word[:-1]
+            while word and word[0] in unnecessaryEndsSet:
+                word = word[1:]
+            if word and word in jobKeywords:
+                if word in jobKeywords:
+                    jobKeywords[word] = True
+            # Update beginningOfWord
+            beginningOfWord = resumeTextIndex + 1
 
-    matched_keywords = set(resume_keywords).intersection(set(job_keywords))
-    unmatched_keywords = set(resume_keywords).difference(set(job_keywords))
-    print(f"Resume Keywords: {resume_keywords}", len(resume_keywords))
-    print(f"Job Keywords: {job_keywords}", len(job_keywords))
-    print(f"Matched Keywords: {matched_keywords}", len(matched_keywords))
-    print(f"Unmatched Keywords: {unmatched_keywords}", len(matched_keywords))
-    score = (len(matched_keywords) / len(job_keywords)) * 100 if job_keywords else 0
+    print(f"Job Keywords: {jobKeywords}", len(jobKeywords))
+    score = 0
+    for keyword in jobKeywords:
+        if jobKeywords[keyword]:
+            score += (100/NUMBER_OF_KEYWORDS)
+    print(f"Score: {int(score)}", score)
+    score = int(score)
+    # resumeText = ' '.join([parsed_data.get('summary', ''), ' '.join(parsed_data.get('skills', []))])
+    # resume_keywords = extract_keywords(resumeText)
+    # jobKeywords = extract_keywords(job_description)
+
+    # matched_keywords = set(resume_keywords).intersection(set(jobKeywords))
+    # unmatched_keywords = set(resume_keywords).difference(set(jobKeywords))
+    # print(f"Resume Keywords: {resume_keywords}", len(resume_keywords))
+    # print(f"Job Keywords: {jobKeywords}", len(jobKeywords))
+    # print(f"Matched Keywords: {matched_keywords}", len(matched_keywords))
+    # print(f"Unmatched Keywords: {unmatched_keywords}", len(matched_keywords))
+    # score = (len(matched_keywords) / len(jobKeywords)) * 100 if jobKeywords else 0
 
     return score
 
@@ -53,6 +140,7 @@ resume_parsed_data = {
         'Certified Kubernetes Administrator'
     ]
 }
+resume_parsed_data = text
 
 job_description = """
 We are seeking a highly skilled and experienced Senior Software Developer to join our dynamic team. 
