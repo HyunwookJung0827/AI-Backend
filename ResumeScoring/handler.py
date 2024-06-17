@@ -11,9 +11,11 @@ def score_resume(parsed_data, job_description):
     job_keywords = extract_keywords(job_description)
 
     matched_keywords = set(resume_keywords).intersection(set(job_keywords))
+    unmatched_keywords = set(resume_keywords).difference(set(job_keywords))
     print(f"Resume Keywords: {resume_keywords}", len(resume_keywords))
     print(f"Job Keywords: {job_keywords}", len(job_keywords))
     print(f"Matched Keywords: {matched_keywords}", len(matched_keywords))
+    print(f"Unmatched Keywords: {unmatched_keywords}", len(matched_keywords))
     score = (len(matched_keywords) / len(job_keywords)) * 100 if job_keywords else 0
 
     return score

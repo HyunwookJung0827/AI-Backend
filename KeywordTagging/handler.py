@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 import json
 import fasttext
+from tags import tagDict
 
 app = Flask(__name__)
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -9,8 +10,11 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 # Path to the downloaded language identification model
 lang_model_path = 'lid.176.bin'
 
-# Load the FastText language identification model
-lang_model = fasttext.load_model(lang_model_path)
+try:
+    # Load the FastText language identification model
+    lang_model = fasttext.load_model(lang_model_path)
+except Exception as e:
+    raise RuntimeError(f"Failed to load language model: {str(e)}")
 
 # Set to use to detect when to catch a word for tagging
 wordStopperSet = {' ', '(', ')', '{', '}', '[', ']', '-', '/', ':', ';', '&', '+', '<', '>'}
@@ -36,56 +40,21 @@ Japanese (ja)
 """
 topLanguageSet = {'en', 'es', 'fr', 'zh', 'hi', 'ar', 'pt', 'bn', 'ru', 'ur', 'ko', 'ja'}
 
-# Dictionary to search the matching keyword from the job description
-tagDict = {
-    'full': ['jobType', 'fullTime'],
-    'fulltime': ['jobType', 'fullTime'],
-    'part': ['jobType', 'partTime'],
-    'parttime': ['jobType', 'partTime'],
-    'contract': ['jobType', 'contract'],
-    'intern': ['jobType', 'internship'],
-    'internship': ['jobType', 'internship'],
-    'commission': ['jobType', 'commission'],
-    'volunteer': ['jobType', 'volunteer'],
-    'weekend': ['workShift', 'weekend'],
-    'weekends': ['workShift', 'weekend'],
-    'evening': ['workShift', 'eveningShift'],
-    'night': ['workShift', 'nightShift'],
-    'flexible': ['workShift', 'flexible'],
-    'health': ['benefits', 'health'],
-    'dental': ['benefits', 'dental'],
-    'vision': ['benefits', 'vision'],
-    'life': ['benefits', 'life'],
-    'bonus': ['benefits', 'bonus'],
-    '401k': ['benefits', '_401k'],
-    'commuter': ['benefits', 'commuter'],
-    'discount': ['benefits', 'employeeDiscounts'],
-    'discounts': ['benefits', 'employeeDiscounts'],
-    'referral': ['benefits', 'referral'],
-    'spanish': ['languages', 'ES'],
-    'communication': ['skills', 'Communication'],
-    'teamwork': ['skills', 'Teamwork'],
-    'leadership': ['skills', 'Leadership'],
-    'adaptability': ['skills', 'Adaptability'],
-    'site': ['workplace', 'onSite'],
-    'remote': ['workplace', 'remote'],
-    'hybrid': ['workplace', 'hybrid']
-    }
-    
+
 @app.route('/', methods=['POST'])
 @cross_origin()  # allow all origins all methods.
 def handler():
     data = request.json
+    if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
     jobDescription = data.get('description', '')
-
     if not jobDescription:
-        return jsonify({'error 1': 'No job description provided'}), 400
+        return jsonify({'error': 'No job description provided'}), 400
 
     try:
         # detectedLanguages: Set of detected languages (unprocessed)
         detectedLanguages = set()
-        # detectedKeyword: Set of detected keywords 
-        detectedKeyword = set()
         
         # ex: { 'employmentType': ['full', 'part', 'hybrid']}
         groupToKeywordDict = {}
@@ -95,9 +64,9 @@ def handler():
         # beginningOfWord: index where the last word ends in jobDescription
         beginningOfWord = 0
         groupToKeywordDict['languages'] = set()
-
         salaryList = []
         skipping = False
+
         for jobDescriptionIndex, char in enumerate(jobDescription):
             # Don't process anything inside the tag
             if char == '>':
@@ -105,7 +74,7 @@ def handler():
                 beginningOfSentence = jobDescriptionIndex + 1
             elif skipping:
                 continue
-            elif char in sentenceStopperSet and beginningOfSentence < jobDescriptionIndex:
+            elif char in sentenceStopperSet and beginningOfSentence < jobDescriptionIndex or jobDescriptionIndex == len(jobDescription) - 1:
                 if char == '<':
                     skipping = True
                 # Detect language for each sentence
@@ -130,7 +99,7 @@ def handler():
         
         if 'EN' in detectedLanguages:
             for jobDescriptionIndex, char in enumerate(jobDescription):
-                if char in wordStopperSet and beginningOfWord < jobDescriptionIndex:
+                if char in wordStopperSet and beginningOfWord < jobDescriptionIndex or jobDescriptionIndex == len(jobDescription) - 1:
                     # Process each word in lowercase
                     word = jobDescription[beginningOfWord: jobDescriptionIndex].strip().lower()
                     while word and word[-1] in unnecessaryEndsSet:
@@ -160,7 +129,6 @@ def handler():
                     # Update beginningOfWord
                     beginningOfWord = jobDescriptionIndex + 1
                 
-        
         # Before putting into JSON
         # Translate each keyword to the matching keyword in our database
         for group in groupToKeywordDict:
@@ -195,12 +163,15 @@ def handler():
                 groupToKeywordDict['payPeriod'] = 'yearly'
 
     except Exception as e:
-        return jsonify({'error 3': f'Language detection failed: {str(e)}'}), 400
+        return jsonify({'error': f'Processing failed: {str(e)}'}), 400
 
     return jsonify({
-        'detected_languages': detectedLanguages,
         'group_to_keyword_dict': groupToKeywordDict,
         'salary': salaryList
     }), 200
+
 if __name__ == '__main__':
-    app.run(debug=True, port=3001)
+    try:
+        app.run(debug=True, port=3001)
+    except Exception as e:
+        raise RuntimeError(f"Failed to start the application: {str(e)}")
