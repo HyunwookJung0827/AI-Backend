@@ -1,6 +1,5 @@
 import yake
 import requests
-from bs4 import BeautifulSoup
 import requests
 import fitz  # PyMuPDF
 import json
@@ -73,7 +72,7 @@ def extract_keywords(text, language="en", deduplication_threshold=0.9, num_of_ke
 def score_resume(parsed_data, job_description):
     resumeText = parsed_data
     beginningOfWord = 0
-    jobKeywords = {keyword: False for keyword in extract_keywords(job_description)}
+    jobKeywords = {keyword.lower(): False for keyword in extract_keywords(job_description)}
     for resumeTextIndex, char in enumerate(resumeText):
         if char in wordStopperSet and beginningOfWord < resumeTextIndex or resumeTextIndex == len(resumeText) - 1:
             # Process each word in lowercase
