@@ -1,6 +1,5 @@
 import yake
 import requests
-import requests
 import fitz  # PyMuPDF
 import json
 
