@@ -1,7 +1,7 @@
 import yake
 
 def extract_keywords(text, language="en", deduplication_threshold=0.9, num_of_keywords=20):
-    kw_extractor = yake.KeywordExtractor(lan=language, n=2, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
+    kw_extractor = yake.KeywordExtractor(lan=language, n=1, dedupLim=deduplication_threshold, top=num_of_keywords, features=None)
     keywords = kw_extractor.extract_keywords(text)
     return [kw for kw, score in keywords]
 
@@ -11,9 +11,11 @@ def score_resume(parsed_data, job_description):
     job_keywords = extract_keywords(job_description)
 
     matched_keywords = set(resume_keywords).intersection(set(job_keywords))
+    unmatched_keywords = set(resume_keywords).difference(set(job_keywords))
     print(f"Resume Keywords: {resume_keywords}", len(resume_keywords))
     print(f"Job Keywords: {job_keywords}", len(job_keywords))
     print(f"Matched Keywords: {matched_keywords}", len(matched_keywords))
+    print(f"Unmatched Keywords: {unmatched_keywords}", len(matched_keywords))
     score = (len(matched_keywords) / len(job_keywords)) * 100 if job_keywords else 0
 
     return score
