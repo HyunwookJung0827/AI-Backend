@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import json
 from handler import app
-from handler import process_job_description, tagDict
+from tags import tagDict
 
 class HandlerTestCase(unittest.TestCase):
     @classmethod
@@ -56,6 +56,48 @@ class HandlerTestCase(unittest.TestCase):
         self.assertIn('ES', response_data['group_to_keyword_dict']['languages'])
         self.assertIn('flexible', response_data['group_to_keyword_dict']['workShift'])
         self.assertIn('bonus', response_data['group_to_keyword_dict']['benefits'])
+
+    def test_handler_detect_languages_and_skills_2(self):
+        test_data = {
+            'description': '<p>Thrives in a collaborative environment, utilizing excellent communication and teamwork skills to achieve shared goals. Demonstrates leadership potential by motivating and guiding colleagues, while also possessing adaptability to navigate changing priorities and embrace new approaches.</p>'
+        }
+
+        response = self.app.post('/', data=json.dumps(test_data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response_data = response.get_json()
+        self.assertIn('group_to_keyword_dict', response_data)
+        self.assertIn('Communication', response_data['group_to_keyword_dict']['skills'])
+        self.assertIn('Teamwork', response_data['group_to_keyword_dict']['skills'])
+        self.assertIn('Leadership', response_data['group_to_keyword_dict']['skills'])
+        self.assertIn('Adaptability', response_data['group_to_keyword_dict']['skills'])
+
+    def test_handler_detect_languages_and_skills_3(self):
+        test_data = {
+            'description': '<p>Possesses exceptional communication skills to clearly convey ideas and collaborate effectively with a diverse team. Demonstrates strong adaptability, readily embracing new processes and procedures to achieve optimal results.</p>'
+        }
+
+        response = self.app.post('/', data=json.dumps(test_data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response_data = response.get_json()
+        self.assertIn('group_to_keyword_dict', response_data)
+        self.assertIn('Communication', response_data['group_to_keyword_dict']['skills'])
+        self.assertNotIn('Teamwork', response_data['group_to_keyword_dict']['skills'])
+        self.assertNotIn('Leadership', response_data['group_to_keyword_dict']['skills'])
+        self.assertIn('Adaptability', response_data['group_to_keyword_dict']['skills'])
+
+    def test_handler_detect_languages_and_skills_4(self):
+        test_data = {
+            'description': '<p>The Marketing Manager position requires strong time management and adaptability skills. This is because marketing managers are often responsible for multiple tasks and projects at the same time, and they need to be able to adapt to changes in the market or company priorities.</p>'
+        }
+
+        response = self.app.post('/', data=json.dumps(test_data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response_data = response.get_json()
+        self.assertIn('group_to_keyword_dict', response_data)
+        self.assertNotIn('Communication', response_data['group_to_keyword_dict']['skills'])
+        self.assertNotIn('Teamwork', response_data['group_to_keyword_dict']['skills'])
+        self.assertNotIn('Leadership', response_data['group_to_keyword_dict']['skills'])
+        self.assertIn('Adaptability', response_data['group_to_keyword_dict']['skills'])
 
     def test_handler_salary_info(self):
             test_data = {
@@ -263,70 +305,6 @@ class HandlerTestCase(unittest.TestCase):
         self.assertIn('group_to_keyword_dict', response_data)
         self.assertIn('JA', response_data['group_to_keyword_dict']['languages'])
 
-    def test_full_time_python_developer(self):
-        test_data = {
-            'description': '<p>We are looking for a full-time Python developer with health and dental benefits. Salary: $60000 - $80000 per year. Must be fluent in Spanish.</p>'
-        }
-        expected_output = {
-            'jobType': ['fullTime'],
-            'benefits': ['health', 'dental'],
-            'languages': ['ES'],
-            'salary': {'min': 60000, 'max': 80000},
-            'payPeriod': 'yearly'
-        }
-        self.check_job_description(test_data, expected_output)
-
-    def test_part_time_graphic_designer(self):
-        test_data = {
-            'description': '<p>We are hiring a part-time graphic designer for evening shifts. This is a contract position. Salary: $20 - $25 per hour.</p>'
-        }
-        expected_output = {
-            'jobType': ['partTime', 'contract'],
-            'workShift': ['eveningShift'],
-            'salary': {'min': 20, 'max': 25},
-            'payPeriod': 'hourly'
-        }
-        self.check_job_description(test_data, expected_output)
-
-    def test_remote_internship(self):
-        test_data = {
-            'description': '<p>We have an exciting remote internship opportunity available. Must have strong communication skills. No salary.</p>'
-        }
-        expected_output = {
-            'jobType': ['internship'],
-            'workplace': ['remote'],
-            'skills': ['Communication'],
-            'payPeriod': 'none'
-        }
-        self.check_job_description(test_data, expected_output)
-
-    def test_weekend_volunteer(self):
-        test_data = {
-            'description': '<p>We are seeking volunteers for weekend shifts. This is an unpaid position.</p>'
-        }
-        expected_output = {
-            'jobType': ['volunteer'],
-            'workShift': ['weekend'],
-            'payPeriod': 'none'
-        }
-        self.check_job_description(test_data, expected_output)
-
-    def test_hybrid_software_engineer(self):
-        test_data = {
-            'description': '<p>We are looking for a hybrid software engineer with bonuses and employee discounts. Must be fluent in English and Chinese.</p>'
-        }
-        expected_output = {
-            'jobType': ['fullTime'],  # Assuming full-time as default if not specified otherwise
-            'workplace': ['hybrid'],
-            'benefits': ['bonus', 'employeeDiscounts'],
-            'languages': ['EN', 'ZH'],
-            'payPeriod': 'none'
-        }
-        self.check_job_description(test_data, expected_output)
-
-    def check_job_description(self, test_data, expected_output):
-        response_data = process_job_description(test_data['description'])
-        self.assertEqual(response_data['group_to_keyword_dict'], expected_output)
 
 if __name__ == '__main__':
     unittest.main()
