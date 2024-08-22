@@ -17,3 +17,6 @@ AI Engineering
 
 Returns a score of the user's resume based on the job description
 PDF Parser + Keyword Extraction(ML) + word process and search
+
+https://github.com/user-attachments/assets/a371a488-9930-4abf-81b2-218db2f393c8
+
